@@ -76,10 +76,6 @@ A desktop application that uses Computer Vision to automate the attendance proce
 
 Clone the Repository (or download the files).
 
-### Install Required Libraries:
-
-Open your terminal/command prompt and run:
-
 ### code
 
 pip install opencv-contrib-python numpy pandas Pillow
