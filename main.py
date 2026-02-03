@@ -4,7 +4,7 @@ from tkinter import ttk
 from tkinter import messagebox as mess
 import tkinter.simpledialog as tsd
 import cv2,os
-os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Ensure relative paths work by setting current working directory (CWD) to the script's folder
+os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Ensure relative paths work by setting Current Working Directory (CWD) to the script's folder
 import csv
 import numpy as np
 from PIL import Image
@@ -187,10 +187,7 @@ def TakeImages():
             mess._show(title='Camera Error', message='Could not open camera')
             return
 
-<<<<<<<<< Temporary merge branch 1
-=========
-        # UPDATE THIS LINE WITH OUR HARDCODED PATH
->>>>>>>>> Temporary merge branch 2
+
         harcascadePath = r"D:\Python\Project\FACE RECOGNITION BASED ATTENDANCE MONITORING SYSTEM\haarcascade_frontalface_default.xml"
 
         detector = cv2.CascadeClassifier(harcascadePath)
@@ -301,7 +298,6 @@ def TrackImages():
         mess._show(title='Data Missing', message='Please click on Save Profile to reset data!!')
         return
 
-    # Use the safe path for the xml file
     harcascadePath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "haarcascade_frontalface_default.xml")
     faceCascade = cv2.CascadeClassifier(harcascadePath)
 
@@ -309,7 +305,6 @@ def TrackImages():
     font = cv2.FONT_HERSHEY_SIMPLEX
     col_names = ['Id', '', 'Name', '', 'Date', '', 'Time']
 
-    # Verify Student Details exist
     exists1 = os.path.isfile("StudentDetails\\StudentDetails.csv")
     if exists1:
         df = pd.read_csv("StudentDetails\\StudentDetails.csv")
@@ -320,12 +315,12 @@ def TrackImages():
         window.destroy()
         return
 
-    # Initialize attendance variable to None to prevent crashes if no face is found
-    attendance = None
+    # LIST TO STOP DUPLICATE ENTRIES
+    marked_ids = []
 
     while True:
         ret, im = cam.read()
-        if not ret: break # Safety check if camera disconnects
+        if not ret: break
 
         gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
         faces = faceCascade.detectMultiScale(gray, 1.2, 5)
@@ -341,27 +336,40 @@ def TrackImages():
                 aa = df.loc[df['SERIAL NO.'] == serial]['NAME'].values
                 ID = df.loc[df['SERIAL NO.'] == serial]['ID'].values
 
-                # Handling data extraction safely
                 ID = str(ID)
                 ID = ID[1:-1]
                 bb = str(aa)
                 bb = bb[2:-2]
 
-                # Save this data to the variable
-                attendance = [str(ID), '', bb, '', str(date), '', str(timeStamp)]
+                # MULTIPLE ATTENDANCE LOGIC STARTS
+                # Only save if we haven't seen this ID in this session yet
+                if ID not in marked_ids:
+                    attendance = [str(ID), '', bb, '', str(date), '', str(timeStamp)]
+
+                    # 1. Add to list so we don't save them again instantly
+                    marked_ids.append(ID)
+
+                    # 2. Save to CSV immediately
+                    file_path = "Attendance\\Attendance_" + date + ".csv"
+                    exists = os.path.isfile(file_path)
+
+                    with open(file_path, 'a+') as csvFile1:
+                        writer = csv.writer(csvFile1)
+                        if not exists:
+                            writer.writerow(col_names)
+                        writer.writerow(attendance)
+
+                    # 3. Update the Table on Screen immediately
+                    tv.insert('', 0, text=ID, values=(bb, date, timeStamp))
 
             else:
-                Id = 'Unknown'
-                bb = str(Id)
+                bb = 'Unknown'
 
             cv2.putText(im, str(bb), (x, y + h), font, 1, (255, 255, 255), 2)
 
         cv2.imshow('Taking Attendance', im)
 
-<<<<<<<<< Temporary merge branch 1
-        # ALLOW CLOSING WITH 'X' BUTTON OR 'Q' AFTER TAKING ATTENDANCE
-=========
->>>>>>>>> Temporary merge branch 2
+        # CHECK FOR CLOSING
         if (cv2.waitKey(1) == ord('q')):
             break
         try:
@@ -370,41 +378,8 @@ def TrackImages():
         except:
             pass
 
-    # Close camera immediately
     cam.release()
     cv2.destroyAllWindows()
-
-    # Only write to file if we actually found a person
-    if attendance is not None:
-        ts = time.time()
-        date = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y')
-        exists = os.path.isfile("Attendance\\Attendance_" + date + ".csv")
-
-        if exists:
-            with open("Attendance\\Attendance_" + date + ".csv", 'a+') as csvFile1:
-                writer = csv.writer(csvFile1)
-                writer.writerow(attendance)
-        else:
-            with open("Attendance\\Attendance_" + date + ".csv", 'a+') as csvFile1:
-                writer = csv.writer(csvFile1)
-                writer.writerow(col_names)
-                writer.writerow(attendance)
-
-        # Update the table on the screen
-        with open("Attendance\\Attendance_" + date + ".csv", 'r') as csvFile1:
-            reader1 = csv.reader(csvFile1)
-            i =  0
-
-            for lines in reader1:
-                i = i + 1
-                if (i > 1):
-                    if (i % 2 != 0):
-                        iidd = str(lines[0]) + '   '
-                        tv.insert('', 0, text=iidd, values=(str(lines[2]), str(lines[4]), str(lines[6])))
-    else:
-        # Tell user no face was recognized
-        mess._show(title='No Attendance', message='No registered face was recognized.')
-        pass
 
 ######################################## USED STUFFS ############################################
 # Initialize global variables and setup date formatting (Number to Month Name)
