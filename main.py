@@ -1,4 +1,6 @@
 ############################################# IMPORTING ################################################
+import requests
+import json
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox as mess
@@ -227,10 +229,24 @@ def TakeImages():
 
         res = "Images Taken for ID : " + Id
         row = [serial, '', Id, '', name]
+
+        # Save to Local CSV
         with open('StudentDetails\\StudentDetails.csv', 'a+') as csvFile:
             writer = csv.writer(csvFile)
             writer.writerow(row)
         csvFile.close()
+
+        # --- SEND TO DJANGO SERVER ---
+        # This sends the new student Name and ID to your database
+        try:
+            ADD_URL = "http://127.0.0.1:8000/api/add_student/"
+            payload = {'student_id': Id, 'name': name}
+            requests.post(ADD_URL, json=payload)
+            print("✅ Student synced with Django Database")
+        except Exception as e:
+            print(f"Could not sync with Server: {e}")
+        # ---------------------------------------
+
         message1.configure(text=res)
     else:
         print("Name check FAILED. Name must be letters only.")
@@ -283,19 +299,16 @@ def getImagesAndLabels(path):
 # Runs the webcam to recognize faces, matches them to the database, and saves the attendance record to a daily CSV file
 def TrackImages():
     check_haarcascadefile()
-    assure_path_exists("Attendance//")
-    assure_path_exists("StudentDetails//")
 
-    # Clear the table on the screen
+    # Clear visual table
     for k in tv.get_children():
         tv.delete(k)
 
     recognizer = cv2.face.LBPHFaceRecognizer_create()
-    exists3 = os.path.isfile("TrainingImageLabel\\Trainner.yml")
-    if exists3:
+    if os.path.isfile("TrainingImageLabel\\Trainner.yml"):
         recognizer.read("TrainingImageLabel\\Trainner.yml")
     else:
-        mess._show(title='Data Missing', message='Please click on Save Profile to reset data!!')
+        mess._show(title='Data Missing', message='Please click on Save Profile first!')
         return
 
     harcascadePath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "haarcascade_frontalface_default.xml")
@@ -303,19 +316,11 @@ def TrackImages():
 
     cam = cv2.VideoCapture(0)
     font = cv2.FONT_HERSHEY_SIMPLEX
-    col_names = ['Id', '', 'Name', '', 'Date', '', 'Time']
 
-    exists1 = os.path.isfile("StudentDetails\\StudentDetails.csv")
-    if exists1:
-        df = pd.read_csv("StudentDetails\\StudentDetails.csv")
-    else:
-        mess._show(title='Details Missing', message='Students details are missing, please check!')
-        cam.release()
-        cv2.destroyAllWindows()
-        window.destroy()
-        return
+    # --- API CONFIGURATION ---
+    API_URL = "http://127.0.0.1:8000/api/mark_attendance/"
+    # -------------------------
 
-    # LIST TO STOP DUPLICATE ENTRIES
     marked_ids = []
 
     while True:
@@ -330,46 +335,36 @@ def TrackImages():
             serial, conf = recognizer.predict(gray[y:y + h, x:x + w])
 
             if (conf < 50):
-                ts = time.time()
-                date = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y')
-                timeStamp = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
-                aa = df.loc[df['SERIAL NO.'] == serial]['NAME'].values
-                ID = df.loc[df['SERIAL NO.'] == serial]['ID'].values
+                detected_id = str(serial)
 
-                ID = str(ID)
-                ID = ID[1:-1]
-                bb = str(aa)
-                bb = bb[2:-2]
+                if detected_id not in marked_ids:
+                    # --- SEND TO DJANGO SERVER ---
+                    try:
+                        payload = {'student_id': detected_id}
+                        response = requests.post(API_URL, json=payload)
 
-                # MULTIPLE ATTENDANCE LOGIC STARTS
-                # Only save if we haven't seen this ID in this session yet
-                if ID not in marked_ids:
-                    attendance = [str(ID), '', bb, '', str(date), '', str(timeStamp)]
+                        if response.status_code == 200:
+                            data = response.json()
+                            if data['status'] == 'success':
+                                # Update GUI Screen
+                                ts = time.time()
+                                timeStamp = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
+                                tv.insert('', 0, text=detected_id, values=(data['name'], "Today", timeStamp))
 
-                    # 1. Add to list so we don't save them again instantly
-                    marked_ids.append(ID)
+                                marked_ids.append(detected_id)
+                                print(f"Success: Marked {data['name']}")
+                            else:
+                                print(f"Server Error: {data['message']}")
+                    except Exception as e:
+                        print(f"Connection Failed: {e}")
 
-                    # 2. Save to CSV immediately
-                    file_path = "Attendance\\Attendance_" + date + ".csv"
-                    exists = os.path.isfile(file_path)
-
-                    with open(file_path, 'a+') as csvFile1:
-                        writer = csv.writer(csvFile1)
-                        if not exists:
-                            writer.writerow(col_names)
-                        writer.writerow(attendance)
-
-                    # 3. Update the Table on Screen immediately
-                    tv.insert('', 0, text=ID, values=(bb, date, timeStamp))
-
+                cv2.putText(im, str(detected_id), (x, y + h), font, 1, (255, 255, 255), 2)
             else:
-                bb = 'Unknown'
-
-            cv2.putText(im, str(bb), (x, y + h), font, 1, (255, 255, 255), 2)
+                cv2.putText(im, "Unknown", (x, y + h), font, 1, (255, 255, 255), 2)
 
         cv2.imshow('Taking Attendance', im)
 
-        # CHECK FOR CLOSING
+        # Close with 'q' or X button
         if (cv2.waitKey(1) == ord('q')):
             break
         try:
