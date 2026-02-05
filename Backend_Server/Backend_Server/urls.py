@@ -16,10 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.http import HttpResponse
 from core.views import mark_attendance_api, add_student_api
+
+# Simple homepage view
+def home(request):
+    return HttpResponse("<h1>Backend Server is Running! 🚀</h1><p>Go to <a href='/admin'>/admin</a> to login.</p>")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/add_student/', add_student_api),
     path('api/mark_attendance/', mark_attendance_api),
+    path('', home), # This handles the empty homepage
 ]
