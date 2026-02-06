@@ -300,10 +300,11 @@ def getImagesAndLabels(path):
 def TrackImages():
     check_haarcascadefile()
 
-    # Clear visual table
+    # Clear the table on the screen so we start fresh
     for k in tv.get_children():
         tv.delete(k)
 
+    # 2. Load the Trained Brain (Model)
     recognizer = cv2.face.LBPHFaceRecognizer_create()
     if os.path.isfile("TrainingImageLabel\\Trainner.yml"):
         recognizer.read("TrainingImageLabel\\Trainner.yml")
@@ -311,68 +312,107 @@ def TrackImages():
         mess._show(title='Data Missing', message='Please click on Save Profile first!')
         return
 
+    # 3. Load the Face Detector (Haar Cascade)
     harcascadePath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "haarcascade_frontalface_default.xml")
     faceCascade = cv2.CascadeClassifier(harcascadePath)
 
+    # 4. Open the Webcam (0 is usually the default camera)
     cam = cv2.VideoCapture(0)
     font = cv2.FONT_HERSHEY_SIMPLEX
 
-    # --- API CONFIGURATION ---
+    # This is the link where we send the attendance data
     API_URL = "http://127.0.0.1:8000/api/mark_attendance/"
-    # -------------------------
 
+    # List to keep track of who is already marked present in this session
     marked_ids = []
 
-    while True:
-        ret, im = cam.read()
-        if not ret: break
+    # Dictionary to remember Names (e.g., ID 101 = "Prashant")
+    # This helps us show the Name on the camera screen instead of just a number
+    name_cache = {}
 
+    # 5. Start the Video Loop (Process every frame)
+    while True:
+        ret, im = cam.read() # Read image from camera
+        if not ret: break    # Stop if camera fails
+
+        # Convert image to Grayscale (Computer sees B&W better)
         gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+
+        # Detect faces in the current frame
         faces = faceCascade.detectMultiScale(gray, 1.2, 5)
 
         for (x, y, w, h) in faces:
+            # Draw a Blue Rectangle around the face
             cv2.rectangle(im, (x, y), (x + w, y + h), (225, 0, 0), 2)
+
+            # Predict: Ask the model "Who is this?"
+            # serial = The Student ID
+            # conf   = How much the face differs (Lower is better)
             serial, conf = recognizer.predict(gray[y:y + h, x:x + w])
 
-            if (conf < 50):
+            # 6. Check Accuracy
+            # We set it to 85 to make it easier to detect faces in different lighting
+            if (conf < 85):
                 detected_id = str(serial)
 
+                # By default, we only know the ID (e.g., "101")
+                display_name = f"ID:{detected_id}"
+
+                # If we have seen this person before, get their Name from memory
+                if detected_id in name_cache:
+                    display_name = name_cache[detected_id]
+
+                # 7. Mark Attendance (If not already marked)
                 if detected_id not in marked_ids:
-                    # --- SEND TO DJANGO SERVER ---
                     try:
+                        # Send the ID to the Django Database
                         payload = {'student_id': detected_id}
                         response = requests.post(API_URL, json=payload)
 
+                        # If Server says "OK"
                         if response.status_code == 200:
                             data = response.json()
                             if data['status'] == 'success':
-                                # Update GUI Screen
+                                actual_name = data['name']
+
+                                # Get Current Time
                                 ts = time.time()
                                 timeStamp = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
-                                tv.insert('', 0, text=detected_id, values=(data['name'], "Today", timeStamp))
 
+                                # Show details on the GUI Table
+                                tv.insert('', 0, text=detected_id, values=(actual_name, "Today", timeStamp))
+
+                                # Add to 'Marked' list so we don't save it again instantly
                                 marked_ids.append(detected_id)
-                                print(f"Success: Marked {data['name']}")
-                            else:
-                                print(f"Server Error: {data['message']}")
+
+                                # Save the name to memory so we can show it on the video
+                                name_cache[detected_id] = actual_name
+                                display_name = actual_name
+
+                                print(f"Success: Marked {actual_name}")
                     except Exception as e:
                         print(f"Connection Failed: {e}")
 
-                cv2.putText(im, str(detected_id), (x, y + h), font, 1, (255, 255, 255), 2)
+                # Show the Name on the camera video
+                cv2.putText(im, display_name, (x, y + h), font, 1, (255, 255, 255), 2)
             else:
+                # If the face matches no one, show "Unknown"
                 cv2.putText(im, "Unknown", (x, y + h), font, 1, (255, 255, 255), 2)
 
+        # Show the video window
         cv2.imshow('Taking Attendance', im)
 
-        # Close with 'q' or X button
+        # Press 'q' on keyboard to close
         if (cv2.waitKey(1) == ord('q')):
             break
+        # Click the 'X' button on the window
         try:
             if cv2.getWindowProperty('Taking Attendance', 0) < 0:
                 break
         except:
             pass
 
+    # Clean up: Close camera and windows
     cam.release()
     cv2.destroyAllWindows()
 
