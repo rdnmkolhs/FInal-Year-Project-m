@@ -21,7 +21,7 @@ from core.views import mark_attendance_api, add_student_api
 
 # Simple homepage view
 def home(request):
-    return HttpResponse("<h1>Backend Server is Running! 🚀</h1><p>Go to <a href='/admin'>/admin</a> to login.</p>")
+    return HttpResponse("<h1>Backend Server is Running! </h1><p>Go to <a href='/admin'>/admin</a> to login.</p>")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
