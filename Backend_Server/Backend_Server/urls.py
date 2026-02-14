@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from django.http import HttpResponse
-from core.views import mark_attendance_api, add_student_api
+from core.views import mark_attendance_api, add_student_api, start_session_api
 
 # Simple homepage view
 def home(request):
@@ -25,7 +25,8 @@ def home(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/add_student/', add_student_api),
     path('api/mark_attendance/', mark_attendance_api),
-    path('', home), # This handles the empty homepage
+    path('', home),
+    path('api/start_session/', start_session_api), # This handles the empty homepage
+    path('api/add_student/', add_student_api),
 ]

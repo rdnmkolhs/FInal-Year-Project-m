@@ -152,13 +152,14 @@ def clear2():
 #######################################################################################
 # Captures 100 face samples via webcam, saves them to the training folder, and updates the student database (CSV)
 def TakeImages():
-    print("--- Starting TakeImages Function ---")
     check_haarcascadefile()
     columns = ['SERIAL NO.', '', 'ID', '', 'NAME']
     assure_path_exists("StudentDetails/")
     assure_path_exists("TrainingImage/")
     serial = 0
     exists = os.path.isfile("StudentDetails\\StudentDetails.csv")
+
+    # Calculate Serial Number
     if exists:
         with open("StudentDetails\\StudentDetails.csv", 'r') as csvFile1:
             reader1 = csv.reader(csvFile1)
@@ -176,35 +177,20 @@ def TakeImages():
     Id = (txt.get())
     name = (txt2.get())
 
-    print(f"ID entered = '{Id}'")
-    print(f"Name entered = '{name}'")
-
     if ((name.isalpha()) or (' ' in name)):
-        print("Name check passed. Attempting to open camera...")
-
         cam = cv2.VideoCapture(0)
 
         if not cam.isOpened():
-            print("ERROR: Camera could not open! Try changing VideoCapture(0) to (1)")
             mess._show(title='Camera Error', message='Could not open camera')
             return
 
-
-        harcascadePath = r"D:\Python\Project\FACE RECOGNITION BASED ATTENDANCE MONITORING SYSTEM\haarcascade_frontalface_default.xml"
-
+        harcascadePath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "haarcascade_frontalface_default.xml")
         detector = cv2.CascadeClassifier(harcascadePath)
-        if detector.empty():
-            print("ERROR: Haarcascade file loaded but is empty/broken!")
-            return
-
         sampleNum = 0
-        print("Loop starting. Please look at the camera.")
 
         while (True):
             ret, img = cam.read()
-            if not ret:
-                print("ERROR: Failed to read frame from camera")
-                break
+            if not ret: break
 
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             faces = detector.detectMultiScale(gray, 1.3, 5)
@@ -213,11 +199,10 @@ def TakeImages():
                 cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
                 sampleNum = sampleNum + 1
 
-                cv2.imwrite("TrainingImage\\" + name + "." + str(serial) + "." + Id + '.' + str(sampleNum) + ".jpg",
-                            gray[y:y + h, x:x + w])
+                # Save Image: Name.Serial.ID.Count.jpg
+                cv2.imwrite("TrainingImage\\" + name + "." + str(serial) + "." + Id + '.' + str(sampleNum) + ".jpg", gray[y:y + h, x:x + w])
                 cv2.imshow('Taking Images', img)
 
-            # Wait for 100 miliseconds
             if cv2.waitKey(100) & 0xFF == ord('q'):
                 break
             elif sampleNum > 100:
@@ -225,7 +210,6 @@ def TakeImages():
 
         cam.release()
         cv2.destroyAllWindows()
-        print(f"Process finished. Images taken: {sampleNum}")
 
         res = "Images Taken for ID : " + Id
         row = [serial, '', Id, '', name]
@@ -237,21 +221,19 @@ def TakeImages():
         csvFile.close()
 
         # --- SEND TO DJANGO SERVER ---
-        # This sends the new student Name and ID to your database
         try:
-            ADD_URL = "http://127.0.0.1:8000/api/add_student/"
+            API_URL = "http://127.0.0.1:8000/api/add_student/"
             payload = {'student_id': Id, 'name': name}
-            requests.post(ADD_URL, json=payload)
-            print("✅ Student synced with Django Database")
+            requests.post(API_URL, json=payload)
+            print(f"Student {name} synced with Database")
         except Exception as e:
-            print(f"Could not sync with Server: {e}")
-        # ---------------------------------------
+            print(f"Server Sync Failed: {e}")
+        # -----------------------------
 
         message1.configure(text=res)
     else:
-        print("Name check FAILED. Name must be letters only.")
         if (name.isalpha() == False):
-            res = "Enter Correct name (Letters only)"
+            res = "Enter Correct name"
             message.configure(text=res)
 
 ########################################################################################
@@ -299,120 +281,97 @@ def getImagesAndLabels(path):
 # Runs the webcam to recognize faces, matches them to the database, and saves the attendance record to a daily CSV file
 def TrackImages():
     check_haarcascadefile()
-
-    # Clear the table on the screen so we start fresh
     for k in tv.get_children():
         tv.delete(k)
 
-    # 2. Load the Trained Brain (Model)
+    # 1. Start Session (Mark Everyone Absent)
+    try:
+        START_URL = "http://127.0.0.1:8000/api/start_session/"
+        requests.get(START_URL)
+        print("Session Started: Everyone marked Absent.")
+    except:
+        print("Server offline.")
+
     recognizer = cv2.face.LBPHFaceRecognizer_create()
     if os.path.isfile("TrainingImageLabel\\Trainner.yml"):
         recognizer.read("TrainingImageLabel\\Trainner.yml")
     else:
-        mess._show(title='Data Missing', message='Please click on Save Profile first!')
+        mess._show(title='Data Missing', message='Save Profile first!')
         return
 
-    # 3. Load the Face Detector (Haar Cascade)
     harcascadePath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "haarcascade_frontalface_default.xml")
     faceCascade = cv2.CascadeClassifier(harcascadePath)
 
-    # 4. Open the Webcam (0 is usually the default camera)
     cam = cv2.VideoCapture(0)
     font = cv2.FONT_HERSHEY_SIMPLEX
 
-    # This is the link where we send the attendance data
     API_URL = "http://127.0.0.1:8000/api/mark_attendance/"
 
-    # List to keep track of who is already marked present in this session
     marked_ids = []
-
-    # Dictionary to remember Names (e.g., ID 101 = "Prashant")
-    # This helps us show the Name on the camera screen instead of just a number
     name_cache = {}
 
-    # 5. Start the Video Loop (Process every frame)
     while True:
-        ret, im = cam.read() # Read image from camera
-        if not ret: break    # Stop if camera fails
+        ret, im = cam.read()
+        if not ret: break
 
-        # Convert image to Grayscale (Computer sees B&W better)
         gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-
-        # Detect faces in the current frame
         faces = faceCascade.detectMultiScale(gray, 1.2, 5)
 
         for (x, y, w, h) in faces:
-            # Draw a Blue Rectangle around the face
             cv2.rectangle(im, (x, y), (x + w, y + h), (225, 0, 0), 2)
-
-            # Predict: Ask the model "Who is this?"
-            # serial = The Student ID
-            # conf   = How much the face differs (Lower is better)
             serial, conf = recognizer.predict(gray[y:y + h, x:x + w])
 
-            # 6. Check Accuracy
-            # We set it to 85 to make it easier to detect faces in different lighting
+            # RELAXED CONFIDENCE
             if (conf < 85):
                 detected_id = str(serial)
 
-                # By default, we only know the ID (e.g., "101")
                 display_name = f"ID:{detected_id}"
-
-                # If we have seen this person before, get their Name from memory
                 if detected_id in name_cache:
                     display_name = name_cache[detected_id]
 
-                # 7. Mark Attendance (If not already marked)
                 if detected_id not in marked_ids:
+                    # --- DEBUGGING PRINT ---
+                    print(f"Detecting ID: {detected_id}... Sending to Server...")
+
                     try:
-                        # Send the ID to the Django Database
                         payload = {'student_id': detected_id}
                         response = requests.post(API_URL, json=payload)
 
-                        # If Server says "OK"
+                        print(f"Server Reply: {response.text}")  # <--- CHECK THIS LINE IN TERMINAL
+
                         if response.status_code == 200:
                             data = response.json()
                             if data['status'] == 'success':
                                 actual_name = data['name']
 
-                                # Get Current Time
                                 ts = time.time()
                                 timeStamp = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
-
-                                # Show details on the GUI Table
                                 tv.insert('', 0, text=detected_id, values=(actual_name, "Today", timeStamp))
 
-                                # Add to 'Marked' list so we don't save it again instantly
                                 marked_ids.append(detected_id)
-
-                                # Save the name to memory so we can show it on the video
                                 name_cache[detected_id] = actual_name
                                 display_name = actual_name
 
-                                print(f"Success: Marked {actual_name}")
+                                print(f"MARKED PRESENT: {actual_name}")
+                            else:
+                                print(f"Server Error: {data['message']}")
                     except Exception as e:
                         print(f"Connection Failed: {e}")
 
-                # Show the Name on the camera video
                 cv2.putText(im, display_name, (x, y + h), font, 1, (255, 255, 255), 2)
             else:
-                # If the face matches no one, show "Unknown"
                 cv2.putText(im, "Unknown", (x, y + h), font, 1, (255, 255, 255), 2)
 
-        # Show the video window
         cv2.imshow('Taking Attendance', im)
 
-        # Press 'q' on keyboard to close
         if (cv2.waitKey(1) == ord('q')):
             break
-        # Click the 'X' button on the window
         try:
             if cv2.getWindowProperty('Taking Attendance', 0) < 0:
                 break
         except:
             pass
 
-    # Clean up: Close camera and windows
     cam.release()
     cv2.destroyAllWindows()
 
