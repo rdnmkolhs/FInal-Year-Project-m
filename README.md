@@ -37,7 +37,7 @@ Instead of manual roll calls, this system detects faces via a webcam, recognizes
 #### Install Python Dependencies
    You need libraries for both the Desktop App and the Django Server.
    pip install opencv-contrib-python numpy pandas Pillow requests django psycopg2-binary
-   #### 3. Setup the Database (PostgreSQL)
+#### Setup the Database (PostgreSQL)
       Install PostgreSQL and create a database named attendance_db.
       Update Backend_Server/settings.py with your database password.
 #### Run the Backend Server
@@ -73,16 +73,16 @@ Instead of manual roll calls, this system detects faces via a webcam, recognizes
       View the list of Students and daily Attendance logs.
 
 
-### How it Works (Logic Flow)
+## How it Works (Logic Flow)
 * Detection: OpenCV (Haar Cascade) finds a face in the video frame.
 * Recognition: The LBPH algorithm compares the face against the trained Trainner.yml model.
-#### API Call:
+## API Call:
 - If a match is found, Python sends the Student ID to the Django Server via HTTP POST.
 - Django updates the PostgreSQL database.
 - Django responds with the Student Name, which is then shown on the camera screen.
 
 
-### Important Notes
+## Important Notes
 * LBPH Algorithm: We use cv2.face.LBPHFaceRecognizer because it is robust against lighting changes.
 * PostgreSQL: Ensure the Postgres service is running before starting Django.
 * Camera: If the camera doesn't open, ensure no other application (like Zoom) is using it.
