@@ -1,6 +1,6 @@
 # Face Recognition Attendance System
-   A hybrid Desktop & Web application that uses Computer Vision to automate the attendance process.
-   Instead of manual roll calls, this system detects faces via a webcam, recognizes registered students using the LBPH Algorithm, and automatically syncs the       attendance data to a Django + PostgreSQL backend server.
+A hybrid Desktop & Web application that uses Computer Vision to automate the attendance process.
+Instead of manual roll calls, this system detects faces via a webcam, recognizes registered students using the LBPH Algorithm, and automatically syncs the       attendance data to a Django + PostgreSQL backend server.
 
 
 ## Key Features
@@ -51,8 +51,8 @@
       Open a new terminal in the main folder:
       python main.py
 
-### How to Use
-      Step 1: Register a New Student
+## How to Use
+#### Step 1: Register a New Student
       Enter ID and Name in the Tkinter App.
       Click "Take Images".
       The app captures 60-100 photos.
