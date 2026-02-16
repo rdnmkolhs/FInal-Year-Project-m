@@ -35,9 +35,9 @@
       git clone https://github.com/MagarPrashant0/Final-Year-Project.git
       cd Final-Year-Project
 #### Install Python Dependencies
-      You need libraries for both the Desktop App and the Django Server.
-      pip install opencv-contrib-python numpy pandas Pillow requests django psycopg2-binary
-      3. Setup the Database (PostgreSQL)
+   You need libraries for both the Desktop App and the Django Server.
+   pip install opencv-contrib-python numpy pandas Pillow requests django psycopg2-binary
+   #### 3. Setup the Database (PostgreSQL)
       Install PostgreSQL and create a database named attendance_db.
       Update Backend_Server/settings.py with your database password.
 #### Run the Backend Server
