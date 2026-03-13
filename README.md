@@ -86,3 +86,8 @@ Instead of manual roll calls, this system detects faces via a webcam, recognizes
 * LBPH Algorithm: We use cv2.face.LBPHFaceRecognizer because it is robust against lighting changes.
 * PostgreSQL: Ensure the Postgres service is running before starting Django.
 * Camera: If the camera doesn't open, ensure no other application (like Zoom) is using it.
+
+
+## Architectural design
+<img width="1408" height="768" alt="arch2" src="https://github.com/user-attachments/assets/5e983938-8560-44a6-b781-3f3fc4de74fa" />
+
